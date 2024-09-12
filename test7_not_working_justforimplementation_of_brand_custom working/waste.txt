@@ -1,0 +1,294 @@
+jQuery(document).ready(function($) {
+    const filterBox = $('#filter-box');
+    const filterOptions = $('#filter-options');
+    const productList = $('#product-list');
+    const noProductsMessage = $('#no-products-message');
+
+    let activeFilters = [];
+    let brandFilters = [];
+
+    // Drag and drop functionality
+    filterOptions.on('dragstart', '.filter-button', function(e) {
+        e.originalEvent.dataTransfer.setData('text/plain', $(this).data('filter'));
+    });
+
+    filterBox.on('dragover', function(e) {
+        e.preventDefault();
+    });
+
+    filterBox.on('drop', function(e) {
+        e.preventDefault();
+        const filterType = e.originalEvent.dataTransfer.getData('text');
+        if (filterType === 'brand') {
+            const filterName = prompt('Enter brand name:');
+            if (filterName) {
+                const filterId = `brand-${Date.now()}`;
+                activeFilters.push(filterId);
+                brandFilters.push(filterName.toLowerCase());
+                $(this).append(`<button type="button" class="active-filter" data-filter="${filterId}">Brand: ${filterName}</button>`);
+            }
+        } else if (filterType === 'custom') {
+            const filterName = prompt('Enter custom filter name:');
+            if (filterName) {
+                const filterId = `custom-${Date.now()}`;
+                activeFilters.push(filterId);
+                $(this).append(`<button type="button" class="active-filter" data-filter="${filterId}">Custom: ${filterName}</button>`);
+            }
+        } else if (!activeFilters.includes(filterType)) {
+            activeFilters.push(filterType);
+            $(this).append(`<button type="button" class="active-filter" data-filter="${filterType}">${filterType}</button>`);
+        }
+        updateProductList();
+    });
+
+    // Remove filter when clicked
+    filterBox.on('click', '.active-filter', function() {
+        const filterType = $(this).data('filter');
+        activeFilters = activeFilters.filter(f => f !== filterType);
+        if (filterType.startsWith('brand-')) {
+            const brandName = $(this).text().split(': ')[1].toLowerCase();
+            brandFilters = brandFilters.filter(b => b !== brandName);
+        }
+        $(this).remove();
+        updateProductList();
+    });
+
+    function updateProductList() {
+        productList.empty();
+        
+        if (activeFilters.length > 0) {
+            const filteredProducts = applyFiltersHierarchically(productData);
+            appendFilteredProducts(filteredProducts);
+        } else {
+            appendAllProducts();
+        }
+
+        if (productList.children().length === 0) {
+            noProductsMessage.show();
+        } else {
+            noProductsMessage.hide();
+        }
+
+        // Apply current sorting
+        sortProducts($('#price-sort').val());
+    }
+
+    function applyFiltersHierarchically(products) {
+        let filteredProducts = [...products];
+    
+        activeFilters.forEach(filter => {
+            if (filter.startsWith('brand-')) {
+                const brandName = $(`[data-filter="${filter}"]`).text().split(': ')[1].toLowerCase();
+                filteredProducts = filteredProducts.filter(product => 
+                    product.categories.some(cat => categories.find(c => c.term_id === cat)?.name.toLowerCase().includes(brandName)) ||
+                    (product.tags && product.tags.some(tag => tag.toLowerCase().includes(brandName)))
+                );
+            } else if (filter === 'categories') {
+                const selectedCategories = $('.category-checkbox:checked').map(function() {
+                    return parseInt($(this).data('category-id'));
+                }).get();
+    
+                if (selectedCategories.length > 0) {
+                    filteredProducts = filteredProducts.filter(product =>
+                        product.categories.some(cat => selectedCategories.includes(cat))
+                    );
+                }
+            } else if (filter === 'gender') {
+                const selectedGenders = $('.gender-checkbox:checked').map(function() {
+                    return $(this).data('gender');
+                }).get();
+    
+                if (selectedGenders.length > 0) {
+                    filteredProducts = filteredProducts.filter(product =>
+                        selectedGenders.includes(product.gender)
+                    );
+                }
+            } else if (filter.startsWith('custom-')) {
+                const customFilterName = $(`[data-filter="${filter}"]`).text().split(': ')[1].toLowerCase();
+                // Implement custom filtering logic here
+                // For example:
+                filteredProducts = filteredProducts.filter(product =>
+                    product.name.toLowerCase().includes(customFilterName) ||
+                    (product.description && product.description.toLowerCase().includes(customFilterName))
+                );
+            }
+        });
+    
+        return filteredProducts;
+    }
+
+    function appendFilteredProducts(products) {
+        const hasBrandFilter = activeFilters.some(f => f.startsWith('brand-'));
+        const hasCategoryFilter = activeFilters.includes('categories');
+        const hasGenderFilter = activeFilters.includes('gender');
+
+        if (hasBrandFilter) {
+            brandFilters.forEach(brand => {
+                const brandProducts = products.filter(product => 
+                    product.categories.some(cat => categories.find(c => c.term_id === cat)?.name.toLowerCase().includes(brand)) ||
+                    (product.tags && product.tags.some(tag => tag.toLowerCase().includes(brand)))
+                );
+
+                if (brandProducts.length > 0) {
+                    let brandHtml = `
+                        <div class="brand-group" data-brand="${brand}">
+                            <h3>Brand Name: ${brand.charAt(0).toUpperCase() + brand.slice(1)}</h3>
+                    `;
+
+                    if (hasCategoryFilter) {
+                        brandHtml += appendCategoriesWithProducts(brandProducts);
+                    } else if (hasGenderFilter) {
+                        brandHtml += appendGenderGroups(brandProducts);
+                    } else {
+                        brandHtml += `
+                            <div class="brand-products">
+                                ${brandProducts.map(product => getProductHtml(product)).join('')}
+                            </div>
+                        `;
+                    }
+
+                    brandHtml += `</div>`;
+                    productList.append(brandHtml);
+                }
+            });
+        } else if (hasCategoryFilter) {
+            productList.append(appendCategoriesWithProducts(products));
+        } else if (hasGenderFilter) {
+            productList.append(appendGenderGroups(products));
+        } else {
+            products.forEach(product => {
+                productList.append(getProductHtml(product));
+            });
+        }
+    }
+
+    function appendCategoriesWithProducts(products) {
+        let categoriesHtml = '';
+        categories.forEach(category => {
+            const categoryProducts = products.filter(product => 
+                product.categories.includes(parseInt(category.term_id))
+            );
+            
+            if (categoryProducts.length > 0) {
+                categoriesHtml += `
+                    <div class="category-group" data-category-id="${category.term_id}">
+                        <h4>${category.name}</h4>
+                `;
+
+                if (activeFilters.includes('gender')) {
+                    categoriesHtml += appendGenderGroups(categoryProducts);
+                } else {
+                    categoriesHtml += `
+                        <div class="category-products">
+                            ${categoryProducts.map(product => getProductHtml(product)).join('')}
+                        </div>
+                    `;
+                }
+
+                categoriesHtml += `</div>`;
+            }
+        });
+        return categoriesHtml;
+    }
+
+    function appendGenderGroups(products) {
+        let gendersHtml = '';
+        const genders = ['men', 'women', 'unisex'];
+        genders.forEach(gender => {
+            const genderProducts = products.filter(product => product.gender === gender);
+            if (genderProducts.length > 0) {
+                gendersHtml += `
+                    <div class="gender-group" data-gender="${gender}">
+                        <h4>${gender.charAt(0).toUpperCase() + gender.slice(1)}</h4>
+                        <div class="gender-products">
+                            ${genderProducts.map(product => getProductHtml(product)).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+        });
+        return gendersHtml;
+    }
+
+    function appendAllProducts() {
+        productData.forEach(product => {
+            productList.append(getProductHtml(product));
+        });
+    }
+
+    function getProductHtml(product) {
+        return `
+            <div class="product-item" data-price="${product.price}" data-name="${product.name.toLowerCase()}">
+                <label>
+                    <input type="checkbox" name="products[]" value="${product.id}">
+                    <span class="product-name">${product.name}</span>
+                    <span class="product-price">${formatPrice(product.price)}</span>
+                </label>
+            </div>
+        `;
+    }
+
+    function formatPrice(price) {
+        return '$' + parseFloat(price).toFixed(2);
+    }
+
+    // Hierarchical selection
+    productList.on('change', '.category-checkbox', function() {
+        const isChecked = $(this).prop('checked');
+        $(this).closest('.category-group').find('input[type="checkbox"]').prop('checked', isChecked);
+    });
+
+    productList.on('change', '.gender-checkbox', function() {
+        const isChecked = $(this).prop('checked');
+        $(this).closest('.gender-group').find('.product-item input[type="checkbox"]').prop('checked', isChecked);
+    });
+
+    // Initialize product list
+    updateProductList();
+
+    // Existing search functionality
+    $('#product-search').on('input', function() {
+        const searchTerm = $(this).val().toLowerCase();
+        $('.product-item').each(function() {
+            const productName = $(this).data('name');
+            $(this).toggle(productName.includes(searchTerm));
+        });
+        updateVisibility();
+    });
+
+    // Updated sort functionality
+    $('#price-sort').on('change', function() {
+        sortProducts($(this).val());
+    });
+
+    function sortProducts(sortOrder) {
+        $('.brand-group, .category-group, .gender-group').each(function() {
+            const $container = $(this).find('.brand-products, .category-products, .gender-products');
+            sortProductsInContainer($container, sortOrder);
+        });
+    }
+
+    function sortProductsInContainer($container, sortOrder) {
+        const $products = $container.children('.product-item');
+        $products.sort(function(a, b) {
+            const priceA = parseFloat($(a).data('price'));
+            const priceB = parseFloat($(b).data('price'));
+            return sortOrder === 'high-low' ? priceB - priceA : priceA - priceB;
+        });
+        $container.append($products);
+    }
+
+    function updateVisibility() {
+        $('.brand-group, .category-group, .gender-group').each(function() {
+            const $group = $(this);
+            const $visibleProducts = $group.find('.product-item:visible');
+            $group.toggle($visibleProducts.length > 0);
+        });
+
+        if ($('.product-item:visible').length === 0) {
+            noProductsMessage.show();
+        } else {
+            noProductsMessage.hide();
+        }
+    }
+});

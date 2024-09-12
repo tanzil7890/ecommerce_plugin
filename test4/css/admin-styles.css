@@ -1,0 +1,39 @@
+
+.pcm-dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.pcm-collections-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+}
+
+.pcm-collection-item {
+    border: 1px solid #ddd;
+    padding: 15px;
+    background-color: #f9f9f9;
+    border-radius: 5px;
+    text-align: center;
+}
+
+.pcm-collection-item h3 {
+    margin-top: 0;
+}
+
+.pcm-collection-item .button {
+    display: inline-block;
+    margin-top: 10px;
+}
+
+.pcm-collection-item .delete-collection {
+    margin-left: 10px;
+    color: #a00;
+}
+
+.pcm-collection-item .delete-collection:hover {
+    color: #dc3232;
+}

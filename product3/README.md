@@ -1,0 +1,2 @@
+In this:
+- also in the sidebar, I want to add one more features where there should be a option to show Top rated product on top by on or off button. If on then only show the top rated product on top else default.

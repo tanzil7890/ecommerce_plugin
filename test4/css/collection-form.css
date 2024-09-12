@@ -1,0 +1,22 @@
+.pcm-row {
+    display: flex;
+    margin-bottom: 20px;
+}
+
+.pcm-column {
+    flex: 1;
+    padding: 0 10px;
+}
+
+.pcm-column.full-width {
+    flex: 0 0 100%;
+}
+
+#product_list {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    padding: 10px;
+}
+
+/* Add more styles as needed */
